@@ -16,6 +16,7 @@ import io.reactivex.schedulers.Schedulers
 import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
 import java.security.KeyStore
 import java.security.KeyStoreException
@@ -81,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private fun networkModule(): DummyApi {
         val retrofit = Retrofit.Builder()
                 .baseUrl(BASE_URL)
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(provideOkHttpClientTimeoutLonger(mCache!!, mX509Manager!!))
                 .build()
@@ -93,7 +95,7 @@ class MainActivity : AppCompatActivity() {
         return Cache(application.cacheDir, cacheSize.toLong())
     }
 
-    fun provideX509TrustManager(): X509TrustManager? {
+    private fun provideX509TrustManager(): X509TrustManager? {
         var x509TrustManager: X509TrustManager? = null
         try {
             val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
@@ -141,7 +143,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        mSubscription?.clear()
+        mSubscription.clear()
         unregisterReceiver(imageChangeBroadcastReceiver)
     }
 
@@ -154,7 +156,13 @@ class MainActivity : AppCompatActivity() {
         mText?.text = text
         mTittle?.text = tittle
 
-        val subscription = networkModule().callDummyApi(text, tittle)
+        val builder = StringBuilder().append(tittle).append("\n").append(text)
+
+        val mapping = Collections.singletonMap("DummyApp", builder.toString())
+
+        val requestBody = RequestBody.create(MediaType.parse("text/plain"), mapping.toString())
+
+        val subscription = networkModule().callDummyApi(requestBody)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe({
@@ -179,9 +187,9 @@ class MainActivity : AppCompatActivity() {
         alertDialogBuilder.setTitle(R.string.notification_listener_service)
         alertDialogBuilder.setMessage(R.string.notification_listener_service_explanation)
         alertDialogBuilder.setPositiveButton(R.string.yes
-        ) { dialog, id -> startActivity(Intent(ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        ) { _, _ -> startActivity(Intent(ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
         alertDialogBuilder.setNegativeButton(R.string.no
-        ) { dialog, id ->
+        ) { _, _ ->
             // If you choose to not enable the notification listener
             // the app. will not work as expected
         }
@@ -189,8 +197,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private val BASE_URL = "http://demo.com/";
-        private val ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners"
-        private val ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
+        private const val BASE_URL = "http://imeistore.net/"
+        private const val ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners"
+        private const val ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
     }
 }
